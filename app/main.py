@@ -1,10 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import interview
 app = FastAPI(title="AI Mock Interview")
 
-origins = ["*"]  # Allow all origins for CORS
+origins = ["http://localhost:5173"]  # Allow all origins for CORS
 
-  
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
     
 app.include_router(interview.router, prefix="/api/interview", tags=["Interview"])
     
