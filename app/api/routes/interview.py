@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.schemas.interview import QuestionRequest, ResponseRequest
-from app.services.openai_service import generate_ai_reply, generate_completion
+from app.schemas.interview import QuestionRequest, ResponseRequest, FeedbackRequest, FeedbackResponse
+from app.services.openai_service import generate_ai_reply, generate_completion, generate_interview_feedback, generate_completion_feedback
 import random
 
 router = APIRouter()
@@ -60,3 +60,14 @@ Keep it professional, conversational, and do not give full feedback now.
         return {"response": ai_text, "isNewQuestion": should_ask_new}
     except Exception as e:
         return {"error": "Failed to generate response", "details": str(e)}
+
+
+
+@router.post("/feedback", response_model=FeedbackResponse)
+def get_feedback(request: FeedbackRequest):
+    feedback = generate_completion_feedback(
+        conversation=[msg.dict() for msg in request.conversationHistory],
+        topic=request.type,
+        difficulty=request.difficulty
+    )
+    return {"feedback": feedback}
