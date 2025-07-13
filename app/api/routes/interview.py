@@ -14,25 +14,38 @@ mockQuestions = {
 def generate_question(payload: QuestionRequest):
     topic = payload.type
     difficulty = payload.difficulty
-    isFirst = payload.isFirst
+    is_first = payload.isFirst
 
     questions = mockQuestions.get(topic, {}).get(difficulty, [])
     if not questions:
-        fallback = f"Let's start with a {difficulty.lower()} {topic} question: Can you tell me about your experience with {topic}?"
+        fallback = f"Let's begin with a {difficulty.lower()} {topic} question: Can you tell me about your experience with {topic}?"
         return {"question": fallback}
 
-    random_question = random.choice(questions)
-    if isFirst:
-        question = f"Hello! I'm your AI interviewer today. We'll be conducting a {topic} interview at {difficulty} level. Let's start with this question: {random_question}"
+    if is_first:
+        if topic == "Frontend":
+            question = (
+                f"Welcome! As your AI interviewer, we're conducting a {difficulty} Frontend interview.\n"
+                f"To begin, can you share your strongest area in Frontend (e.g., HTML, CSS, JavaScript, React)?"
+            )
+        elif topic == "Backend":
+            question = (
+                f"Hi there! Let's start your {difficulty} Backend interview.\n"
+                f"What technologies or concepts do you feel most confident with — APIs, databases, authentication, or others?"
+            )
+        else:
+            question = (
+                f"Hello! I'm your AI interviewer today. We'll be conducting a {topic} interview at {difficulty} level. "
+                f"Let's begin with this question: {random.choice(questions)}"
+            )
     else:
-        question = random_question
+        question = random.choice(questions)
 
     return {"question": question}
 
 
 @router.post("/response")
 def generate_response(payload: ResponseRequest):
-    type = payload.type
+    topic = payload.type
     difficulty = payload.difficulty
     user_response = payload.userResponse
     history = payload.conversationHistory
@@ -40,26 +53,53 @@ def generate_response(payload: ResponseRequest):
 
     should_ask_new = count < 5 and random.random() > 0.3
 
-    system_prompt = f"""You are an expert {type} interviewer conducting a {difficulty.lower()} level interview.
-    
-The candidate just responded: "{user_response}"
-
-Your task:
-1. Briefly acknowledge their response (1-2 sentences)
-2. {"Ask a new question" if should_ask_new else "Ask a follow-up question to dive deeper"}
-
-Keep it professional, conversational, and do not give full feedback now.
-"""
-
+    # Context from the last 4 messages
     context = "\n".join([f'{msg["role"]}: {msg["content"]}' for msg in history[-4:]])
 
-    prompt = f"Conversation context:\n{context}\n\nCandidate's latest response: {user_response}"
+    # Tailored system prompt
+    if topic == "Frontend":
+        system_prompt = f"""
+You are a seasoned Frontend interviewer conducting a {difficulty.lower()} level interview.
+
+The candidate has just said: "{user_response}"
+
+1. Briefly acknowledge the response.
+2. If they mentioned React, JavaScript, HTML, or CSS — ask deeper or practical questions in that area.
+3. Otherwise, move progressively from HTML/CSS → JS → React → performance/security.
+
+Keep tone friendly but professional. No feedback yet. Just ask meaningful, increasingly insightful questions.
+"""
+    elif topic == "Backend":
+        system_prompt = f"""
+You're an expert Backend interviewer running a {difficulty.lower()} interview.
+
+Given the candidate's answer: "{user_response}",
+
+- Ask deeper questions based on their answer.
+- Touch on topics like REST APIs, databases, authentication, scaling, or error handling.
+
+Remain professional and focused. No evaluation yet.
+"""
+    else:
+        system_prompt = f"""
+You are an expert {topic} interviewer conducting a {difficulty.lower()} level interview.
+
+The candidate responded: "{user_response}"
+
+1. Acknowledge the response briefly.
+2. { "Ask a new question" if should_ask_new else "Ask a deeper follow-up question" }
+
+Avoid full feedback. Keep it conversational and focused.
+"""
+
+    prompt = f"Recent conversation:\n{context}\n\nCandidate's response: {user_response}"
 
     try:
         ai_text = generate_completion(prompt=prompt, system_prompt=system_prompt)
         return {"response": ai_text, "isNewQuestion": should_ask_new}
     except Exception as e:
         return {"error": "Failed to generate response", "details": str(e)}
+
 
 
 
@@ -70,4 +110,4 @@ def get_feedback(request: FeedbackRequest):
         topic=request.type,
         difficulty=request.difficulty
     )
-    return {"feedback": feedback}
+    return feedback 

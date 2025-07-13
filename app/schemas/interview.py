@@ -28,4 +28,8 @@ class FeedbackRequest(BaseModel):
 
 # Feedback response schema
 class FeedbackResponse(BaseModel):
-    feedback: str
+    score: int  # 0–100
+    strengths: List[str]
+    improvements: List[str]
+    suggestions: List[str]
+    detailedAnalysis: str

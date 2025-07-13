@@ -1,6 +1,7 @@
 import requests
 import openai 
 from app.core.config import OPENAI_API_KEY, CHAT_COMPLETION_URL
+import json
 
 openai.api_key = OPENAI_API_KEY
 
@@ -61,14 +62,28 @@ def generate_interview_feedback(conversation, topic, difficulty, model="gpt-4o")
 
 
 def generate_completion_feedback(conversation, topic, difficulty, model: str = "gpt-4.1-nano") -> str:
+    
+    system_prompt = f"""
+You are a senior technical interviewer. Evaluate the following {topic} mock interview (difficulty: {difficulty}).
+Provide a structured JSON feedback with the following fields:
+
+1. score (0–100) - integer
+2. strengths - list of 3 bullet points
+3. improvements - list of 3 bullet points
+4. suggestions - list of 3 personalized improvement tips
+5. detailedAnalysis - 1 paragraph detailed feedback
+
+Respond with only valid JSON. No explanations.
+"""
+
     url = CHAT_COMPLETION_URL
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {OPENAI_API_KEY}"
     }
     messages = [
-        {"role": "system", "content": f"You are an expert interviewer in {topic} at {difficulty} level. Evaluate the following mock interview."},
-        {"role": "user", "content": "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation])},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation])}
     ]
     payload = {
         "messages": messages,
@@ -79,7 +94,11 @@ def generate_completion_feedback(conversation, topic, difficulty, model: str = "
 
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
-        data = response.json()
-        return data["choices"][0]["message"]["content"].strip()
+            data = response.json()
+            try:
+                content = data["choices"][0]["message"]["content"]
+                return json.loads(content)  # convert OpenAI JSON string to dict
+            except Exception as e:
+                raise Exception(f"Failed to parse OpenAI feedback JSON: {e}")
     else:
-        raise Exception(f"Error: {response.status_code} - {response.text}")
+        raise Exception(f"OpenAI API error: {response.status_code} - {response.text}")
